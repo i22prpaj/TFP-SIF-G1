@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# Script optimizado para configuración específica de Asterisk con Zadarma
+# Complementa al script principal call-center-modules+complete+copy.sh
+# Se enfoca solo en configuraciones específicas no cubiertas por el script principal
+
+set -e
+
 # Detectar sistema operativo y limpiar pantalla
 if [ "$OSTYPE" == "msys" ] || [ "$OSTYPE" == "win32" ]; then
     cls
@@ -7,7 +13,7 @@ else
     clear
 fi
 
-# Arte ASCII
+# Arte ASCII simplificado
 art_ascii="
      ██████╗ ██████╗  ██████╗  ██████╗       ██████╗ █████╗ ██╗     ██╗         
     ██╔═══██╗██╔══██╗██╔═══██╗██╔═══██╗     ██╔════╝██╔══██╗██║     ██║         
@@ -16,12 +22,7 @@ art_ascii="
     ╚██████╔╝██████╔╝╚██████╔╝╚██████╔╝     ╚██████╗██║  ██║███████╗███████╗    
      ╚═════╝ ╚═════╝  ╚═════╝  ╚═════╝       ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝    
 
-     ██████╗███████╗███╗   ██╗████████╗███████╗██████╗
-    ██╔════╝██╔════╝████╗  ██║╚══██╔══╝██╔════╝██╔══██╗
-    ██║     █████╗  ██╔██╗ ██║   ██║   █████╗  ██████╔╝    VOIP EDITION
-    ██║     ██╔══╝  ██║╚██╗██║   ██║   ██╔══╝  ██╔══██╗
-    ╚██████╗███████╗██║ ╚████║   ██║   ███████╗██║  ██║
-     ╚═════╝╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚══════╝╚═╝  ╚═╝
+                    ASTERISK OPTIMIZATION & TESTING
 "
 
 echo -e "$art_ascii\n"
@@ -33,502 +34,345 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# Variables globales
-ODOO_ADDONS_DIR="external-addons"
-REQUIRED_MODULES=("asterisk_plus" "base_phone")
+# Colores para output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Variables específicas
 ASTERISK_CONF_DIR="/etc/asterisk"
 WORKING_DIR=$(pwd)
-TEMP_DIR="/tmp/odoo_call_center_setup"
 
-# Obtener la IP externa de la instancia
-get_external_ip() {
-    # Intentar obtener la IP pública usando curl a un servicio externo
-    EXTERNAL_IP=$(curl -s https://api.ipify.org 2>/dev/null)
+# Verificar que el script principal ya se haya ejecutado
+check_main_script_execution() {
+    echo -e "${YELLOW}[+] Verificando configuración previa...${NC}"
     
-    # Si aún no tenemos la IP, pedir al usuario
-    if [ -z "$EXTERNAL_IP" ]; then
-        read -p "[?] No se pudo determinar la IP pública automáticamente. Por favor, ingrese la IP externa de su instancia: " EXTERNAL_IP
-    fi
-    
-    echo "$EXTERNAL_IP"
-}
-
-# Verificar la existencia de los módulos requeridos
-check_required_modules() {
-    echo "[+] Verificando módulos requeridos..."
-    local missing_modules=()
-    
-    for module in "${REQUIRED_MODULES[@]}"; do
-        if [ ! -d "$ODOO_ADDONS_DIR/$module" ]; then
-            missing_modules+=("$module")
-        else
-            echo "[✓] Módulo $module encontrado en $ODOO_ADDONS_DIR"
-        fi
-    done
-    
-    if [ ${#missing_modules[@]} -gt 0 ]; then
-        echo "[!] Faltan los siguientes módulos: ${missing_modules[*]}"
-        echo "[!] Por favor, asegúrese de que estos módulos estén en la carpeta $ODOO_ADDONS_DIR"
-        
-        read -p "¿Desea continuar de todos modos? (y/n): " continue_anyway
-        if [[ ! "$continue_anyway" =~ ^[Yy]$ ]]; then
-            echo "[!] Instalación abortada."
-            exit 1
-        fi
-    fi
-}
-
-# Instalar dependencias del sistema
-install_system_dependencies() {
-    echo "[+] Instalando dependencias del sistema..."
-    
-    apt update
-    apt install -y asterisk asterisk-modules asterisk-core-sounds-en-gsm gnupg2 wget lsb-release curl python3-pip
-    
-    if [ $? -ne 0 ]; then
-        echo "[-] Error instalando dependencias del sistema."
+    if [ ! -f "$ASTERISK_CONF_DIR/pjsip.conf" ] || [ ! -f "$ASTERISK_CONF_DIR/extensions.conf" ]; then
+        echo -e "${RED}[!] No se encontraron archivos de configuración básicos${NC}"
+        echo -e "${RED}[!] Por favor ejecute primero: call-center-modules+complete+copy.sh${NC}"
         exit 1
     fi
     
-    # Instalar dependencias de Python para los módulos
-    pip3 install phonenumbers py-Asterisk
-    
-    echo "[✓] Dependencias del sistema instaladas correctamente"
+    echo -e "${GREEN}[✓] Configuración básica encontrada${NC}"
 }
 
-# Configurar Asterisk
-configure_asterisk() {
-    echo "[+] Configurando Asterisk..."
+# Obtener IP externa optimizada
+get_external_ip() {
+    # Intentar múltiples métodos para obtener IP externa
+    local ip=""
     
-    # Configurar Asterisk Manager Interface (AMI) para Odoo
-    echo "[+] Configurando Asterisk Manager Interface (AMI)..."
-    cat > "$ASTERISK_CONF_DIR/manager.conf" << EOF
-[general]
-enabled  = yes
-port     = 5038
-bindaddr = 0.0.0.0
-bindport = 8088
+    # Método 1: GCP metadata service
+    ip=$(curl -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip 2>/dev/null || echo "")
+    
+    # Método 2: Servicios públicos
+    if [ -z "$ip" ]; then
+        ip=$(curl -s --connect-timeout 5 https://api.ipify.org 2>/dev/null || echo "")
+    fi
+    
+    if [ -z "$ip" ]; then
+        ip=$(curl -s --connect-timeout 5 http://checkip.amazonaws.com 2>/dev/null || echo "")
+    fi
+    
+    # Fallback: IP local
+    if [ -z "$ip" ]; then
+        ip=$(hostname -I | awk '{print $1}')
+    fi
+    
+    echo "$ip"
+}
 
-[admin]
-secret = admin
-read = all
-write = all
+# Optimización específica de Asterisk
+optimize_asterisk_performance() {
+    echo -e "${BLUE}[+] Optimizando rendimiento de Asterisk...${NC}"
+    
+    # Crear configuración optimizada para logger.conf
+    cat > "$ASTERISK_CONF_DIR/logger.conf" << 'EOF'
+[general]
+dateformat = %F %T.%3q
+
+[logfiles]
+console => notice,warning,error,debug,verbose
+messages => notice,warning,error
+full => notice,warning,error,debug,verbose
+syslog.local0 => notice,warning,error
 EOF
 
-    # Configurar SIP para Zadarma
-    echo "[+] Configurando SIP..."
-    cat > "$ASTERISK_CONF_DIR/sip.conf" << EOF
+    # Configuración de CDR optimizada
+    cat > "$ASTERISK_CONF_DIR/cdr.conf" << 'EOF'
 [general]
-context=default
-allowoverlap=no
-udpbindaddr=0.0.0.0
-tcpenable=no
-tcpbindaddr=0.0.0.0
-transport=udp
-srvlookup=yes
-allowguest=no
-alwaysauthreject=yes
-canreinvite=no
-nat=force_rport,comedia
-session-timers=refuse
-dtmfmode=rfc2833
-disallow=all
-allow=ulaw
-allow=alaw
-allow=gsm
-videosupport=yes
-maxexpiry=3600
-minexpiry=60
-defaultexpiry=3600
-rtptimeout=60
-rtpholdtimeout=300
-
-; Registro con Zadarma
-[zadarma]
-type=friend
-host=sip.zadarma.com
-fromuser=908733
-secret=118bGuzuEt
-context=from-zadarma
-dtmfmode=rfc2833
-disallow=all
-allow=ulaw
-allow=alaw
-allow=gsm
-nat=force_rport,comedia
-qualify=yes
-canreinvite=no
+enable = yes
+unanswered = yes
+congestion = yes
+endbeforehexten = yes
+initiatedseconds = yes
+batch = no
+size = 100
+time = 300
 EOF
 
-    # Configurar plan de marcado (dialplan)
-    echo "[+] Configurando plan de marcado..."
-    cat > "$ASTERISK_CONF_DIR/extensions.conf" << EOF
-[general]
-static=yes
-writeprotect=no
-autofallthrough=yes
-priorityjumping=no
-extenpatternmatchnew=yes
-
-[globals]
-TRUNK_ENDPOINT = zadarma-endpoint
-CONTRY_CODE = 34   ; Spain country code
-DIAL_TIMEOUT = ,30 ; Timeout for dial operations
-
+    # Configuración de música en espera
+    cat > "$ASTERISK_CONF_DIR/musiconhold.conf" << 'EOF'
 [default]
-; Extensión 1001 (Administrador)
-exten => 1001,1,NoOp(Llamada entrante para 1001 - Administrador)
-exten => 1001,n,Set(CALLERID(name)=Administrador)
-exten => 1001,n,Dial(PJSIP/1001,20)
-exten => 1001,n,Hangup()
-
-; Extensión 1002 (Usuario Prueba)
-exten => 1002,1,NoOp(Llamada entrante para 1002 - Usuario Prueba)
-exten => 1002,n,Set(CALLERID(name)=Usuario Prueba)
-exten => 1002,n,Dial(PJSIP/1002,20)
-exten => 1002,n,Hangup()
-
-; Echo test
-exten => 600,1,Answer()
-exten => 600,n,Echo()
-exten => 600,n,Hangup()
-
-; Contexto para llamadas salientes desde Odoo
-exten => _1XXX,1,NoOp(Llamada interna desde \${CALLERID(num)} a \${EXTEN})
-exten => _1XXX,n,Set(CDR(userfield)=\${CALLERID(num)})
-exten => _1XXX,n,Dial(PJSIP/\${EXTEN},20)
-exten => _1XXX,n,Hangup()
-
-; Patrón genérico para otras llamadas
-exten => _X.,1,NoOp(Llamada desde \${CALLERID(num)} a \${EXTEN})
-exten => _X.,n,Set(CDR(userfield)=\${CALLERID(num)})
-exten => _X.,n,Dial(PJSIP/\${EXTEN},20)
-exten => _X.,n,Hangup()
-
-[from-zadarma]
-exten => _X.,1,NoOp(Llamada entrante desde Zadarma: \${CALLERID(num)} hacia \${EXTEN})
- same => n,Set(CALLERID(name)=\${CALLERID(num)})
- same => n,Answer()
- same => n,Dial(PJSIP/1001,60)
- same => n,Hangup()
-
-[outbound]
-exten => _X.,1,NoOp(Llamada saliente hacia \${EXTEN})
- same => n,Set(CALLERID(all)=Odoo <908733>)
- same => n,Dial(PJSIP/zadarma-endpoint/\${EXTEN})
- same => n,Hangup()
+mode = files
+directory = /var/lib/asterisk/moh
+random = yes
 EOF
 
-    # Configurar PJSIP
-    echo "[+] Configurando PJSIP..."
-    cat > "$ASTERISK_CONF_DIR/pjsip.conf" << EOF
-[global]
-type = global
-user_agent = Platform PBX
-endpoint_identifier_order = ip,username,anonymous
-
-[transport-udp]
-type=transport
-protocol=udp
-bind=0.0.0.0:5060
-external_media_address=172.27.128.1
-external_signaling_address=172.27.128.1
-
-;-------------------------------- Templates ------------------------------------
-[endpoint_template](!)
-type=endpoint
-context=dp_call_inout
-disallow=all
-allow=ulaw,alaw,g722
-direct_media=no
-device_state_busy_at=1
-rtp_symmetric=yes
-force_rport=yes
-rewrite_contact=yes
-
-[auth_template](!)
-type=auth
-auth_type=userpass
-
-[aor_template](!)
-type=aor
-max_contacts=1
-remove_existing=yes
-qualify_frequency=60
-
-;-------------------------------- Endpoints Internos --------------------------
-[1001](endpoint_template)
-auth=auth1001
-aors=aor1001
-callerid=Administrador <1001>
-set_var=ODOO_USER=admin
-
-[auth1001](auth_template)
-password=clave_segura
-username=1001
-
-[aor1001](aor_template)
-
-[1002](endpoint_template)
-auth=auth1002
-aors=aor1002
-callerid=Usuario Prueba <1002>
-set_var=ODOO_USER=usuario_prueba
-
-[auth1002](auth_template)
-password=password_user_1002
-username=1002
-
-[aor1002](aor_template)
-
-;-------------------------------- Zadarma (Trunk) ----------------------------
-[zadarma-endpoint](endpoint_template)
-transport=transport-udp
-outbound_auth=zadarma-auth
-aors=zadarma-aor
-qualify_timeout = 500
-
-[zadarma-auth](auth_template)
-username=908733
-password=118bGuzuEt
-
-[zadarma-aor](aor_template)
-qualify_frequency = 60
-
-[zadarma-registration]
-type=registration
-outbound_auth=zadarma-auth
-server_uri=sip:sip.zadarma.com:5060
-client_uri=sip:908733@sip.zadarma.com
-retry_interval=60
-
-[zadarma-ident]
-type=identify
-endpoint=zadarma-endpoint
-match=sip.zadarma.com
-
-;-------------------------------- Identificación por IP ----------------------
-[1001-ident]
-type=identify
-endpoint=1001
-match=172.27.128.1
-EOF
-
-    # Configurar ARI
-    echo "[+] Configurando ARI..."
-    cat > "$ASTERISK_CONF_DIR/ari.conf" << EOF
-[general]
-enabled = yes
-pretty = yes
-bindaddr = 0.0.0.0
-bindport = 8088
-allowed_origins = *
-
-[admin]
-type = user
-read_only = no
-password = admin
-EOF
-
-    echo "[✓] Asterisk configurado correctamente"
+    echo -e "${GREEN}[✓] Optimizaciones aplicadas${NC}"
 }
 
-# Configurar permisos adecuados para los módulos
-set_permissions() {
-    echo "[+] Configurando permisos para los módulos..."
-    chmod -R 755 "$ODOO_ADDONS_DIR"
-    chown -R 1000:1000 "$ODOO_ADDONS_DIR"  # UID:GID típico para el usuario odoo en el contenedor
-    echo "[✓] Permisos configurados correctamente"
-}
-
-# Test de conectividad de Asterisk
-test_asterisk_connectivity() {
-    echo "[+] Probando conexión con Asterisk..."
+# Configurar firewall específico para Asterisk
+configure_asterisk_firewall() {
+    echo -e "${BLUE}[+] Configurando reglas de firewall para Asterisk...${NC}"
     
-    # Probar la conectividad al AMI
-    echo "[+] Probando conexión al AMI (puerto 5038)..."
-    nc -zv localhost 5038 &>/dev/null
-    
-    if [ $? -eq 0 ]; then
-        echo "[✓] Conexión al AMI establecida correctamente"
+    # Verificar si ufw está instalado
+    if command -v ufw &> /dev/null; then
+        # Permitir puertos SIP y RTP
+        ufw allow 5060/udp comment "Asterisk SIP"
+        ufw allow 5038/tcp comment "Asterisk AMI"
+        ufw allow 8088/tcp comment "Asterisk ARI/HTTP"
+        ufw allow 10000:20000/udp comment "Asterisk RTP"
+        
+        echo -e "${GREEN}[✓] Reglas UFW configuradas${NC}"
+    elif command -v iptables &> /dev/null; then
+        # Configurar iptables si UFW no está disponible
+        iptables -A INPUT -p udp --dport 5060 -j ACCEPT
+        iptables -A INPUT -p tcp --dport 5038 -j ACCEPT
+        iptables -A INPUT -p tcp --dport 8088 -j ACCEPT
+        iptables -A INPUT -p udp --dport 10000:20000 -j ACCEPT
+        
+        echo -e "${GREEN}[✓] Reglas iptables configuradas${NC}"
     else
-        echo "[-] Error: No se puede conectar al AMI (puerto 5038)"
-        echo "[!] Verifique la configuración de Asterisk y que el servicio esté en ejecución"
-    fi
-    
-    # Probar la conectividad SIP
-    echo "[+] Probando conectividad SIP (puerto 5060)..."
-    nc -zuv localhost 5060 &>/dev/null
-    
-    if [ $? -eq 0 ]; then
-        echo "[✓] Puerto SIP accesible correctamente"
-    else
-        echo "[-] Error: No se puede acceder al puerto SIP (5060)"
-        echo "[!] Verifique la configuración de Asterisk y que el servicio esté en ejecución"
+        echo -e "${YELLOW}[!] No se encontró firewall configurado${NC}"
     fi
 }
 
-# Crear SIP hardphone de prueba para verificar funcionamiento
-create_test_sip_extension() {
-    echo "[+] Creando extensión SIP de prueba..."
+# Test avanzado de conectividad Asterisk
+advanced_asterisk_connectivity_test() {
+    echo -e "${BLUE}[+] Realizando tests avanzados de conectividad...${NC}"
     
-    # Añadir extensión de prueba al archivo pjsip.conf
-    cat >> "$ASTERISK_CONF_DIR/pjsip.conf" << EOF
-
-; Extensión de prueba para verificar funcionamiento
-[test_extension](endpoint_template)
-auth=test_auth
-aors=test_aor
-callerid=Test Extension <2000>
-
-[test_auth](auth_template)
-password=test_password
-username=test_extension
-
-[test_aor](aor_template)
-EOF
+    # Test 1: AMI connectivity
+    echo -e "${YELLOW}[+] Testeando AMI (puerto 5038)...${NC}"
+    if timeout 5 bash -c "</dev/tcp/localhost/5038" 2>/dev/null; then
+        echo -e "${GREEN}[✓] AMI accesible${NC}"
+    else
+        echo -e "${RED}[✗] AMI no accesible${NC}"
+    fi
     
-    echo "[✓] Extensión de prueba creada correctamente"
-    echo "[i] Datos para configurar un softphone de prueba:"
-    echo "    - Servidor: $(get_external_ip)"
-    echo "    - Puerto: 5060"
-    echo "    - Usuario: test_extension"
-    echo "    - Contraseña: test_password"
+    # Test 2: ARI/HTTP connectivity
+    echo -e "${YELLOW}[+] Testeando ARI/HTTP (puerto 8088)...${NC}"
+    if timeout 5 bash -c "</dev/tcp/localhost/8088" 2>/dev/null; then
+        echo -e "${GREEN}[✓] ARI/HTTP accesible${NC}"
+    else
+        echo -e "${RED}[✗] ARI/HTTP no accesible${NC}"
+    fi
+    
+    # Test 3: SIP registration
+    echo -e "${YELLOW}[+] Verificando registro SIP con Zadarma...${NC}"
+    if asterisk -rx "pjsip show registrations" | grep -q "zadarma"; then
+        echo -e "${GREEN}[✓] Registro SIP activo${NC}"
+    else
+        echo -e "${YELLOW}[!] Registro SIP no detectado${NC}"
+    fi
+    
+    # Test 4: Endpoints status
+    echo -e "${YELLOW}[+] Verificando estado de endpoints...${NC}"
+    asterisk -rx "pjsip show endpoints" | grep -E "(1001|1002|ext100|zadarma)" || echo -e "${YELLOW}[!] Algunos endpoints no están registrados${NC}"
 }
 
-# Función para proporcionar instrucciones después de la instalación
-post_install_instructions() {
+# Generar archivo de configuración específico para Odoo
+generate_odoo_asterisk_config() {
+    echo -e "${BLUE}[+] Generando configuración específica para Odoo...${NC}"
+    
     EXTERNAL_IP=$(get_external_ip)
-    echo ""
-    echo "===================================================================="
-    echo "          INSTRUCCIONES PARA COMPLETAR LA INTEGRACIÓN DEL           "
-    echo "                CALL CENTER DE ODOO CON ZADARMA                     "
-    echo "===================================================================="
-    echo ""
-    echo "1. VERIFICACIÓN DE CONFIGURACIÓN DE ZADARMA:"
-    echo "   - Se ha configurado Zadarma con los siguientes datos:"
-    echo "     * Usuario: 908733"
-    echo "     * Contraseña: 118bGuzuEt"
-    echo "     * Servidor: sip.zadarma.com"
-    echo ""
-    echo "2. ACCESO A ODOO Y ACTIVACIÓN DE MÓDULOS:"
-    echo "   - Accede a Odoo y activa los siguientes módulos:"
-    echo "     * asterisk_plus"
-    echo "     * base_phone"
-    echo "     * phone_validation"
-    echo ""
-    echo "3. CONFIGURACIÓN DE LA INTEGRACIÓN ASTERISK EN ODOO:"
-    echo "   - Ve a Ajustes > Técnico > Asterisk Servers"
-    echo "   - Configura un nuevo servidor Asterisk con estos datos:"
-    echo "     * Nombre: Asterisk"
-    echo "     * DNS: asterisk"
-    echo "     * Puerto AMI: 5038"
-    echo "     * Puerto ARI: 8088"
-    echo "     * Usuario AMI/ARI: admin"
-    echo "     * Contraseña AMI/ARI: admin"
-    echo "     * Prueba la conexión con Asterisk"
-    echo ""
-    echo "4. CONFIGURACIÓN DE USUARIOS DE ODOO:"
-    echo "   - Para cada usuario que necesite manejar llamadas:"
-    echo "     * Ve a Usuarios > [Seleccionar Usuario]"
-    echo "     * En la pestaña 'Telefonía', configura la extensión correspondiente"
-    echo ""
-    echo "5. CONFIGURACIÓN DEL SOFTPHONE (PARA CADA USUARIO):"
-    echo "   - Descarga un softphone como Zoiper, Linphone o MicroSIP"
-    echo "   - Configura la cuenta SIP con estos datos:"
-    echo "     * Servidor SIP: $EXTERNAL_IP"
-    echo "     * Puerto: 5060"
-    echo "     * Usuario: 1001 (administrador) o 1002 (usuario_prueba)"
-    echo "     * Contraseña: clave_segura (para 1001) o password_user_1002 (para 1002)"
-    echo ""
-    echo "6. PROBANDO EL SISTEMA:"
-    echo "   - Para probar una llamada interna:"
-    echo "     * Desde el softphone con extensión 1001, marca 1002"
-    echo "     * La llamada debería llegar al softphone con extensión 1002"
-    echo ""
-    echo "   - Para probar una llamada entrante de Zadarma:"
-    echo "     * La llamada debería aparecer en el softphone con extensión 1001"
-    echo ""
-    echo "7. SOLUCIÓN DE PROBLEMAS:"
-    echo "   - Verifica logs de Asterisk: tail -f /var/log/asterisk/full"
-    echo "   - Comprueba estado Asterisk: asterisk -rvvv"
-    echo "   - Verifica puertos abiertos: netstat -tuplan | grep asterisk"
-    echo ""
-    echo "===================================================================="
+    
+    # Crear archivo de configuración para Odoo
+    cat > "$WORKING_DIR/odoo_asterisk_config.txt" << EOF
+# Configuración para Asterisk Server en Odoo
+# Vaya a: Configuración > Técnico > Asterisk Servers
+
+DATOS DE CONEXIÓN:
+- Nombre: Asterisk Platform PBX
+- IP/DNS: $EXTERNAL_IP
+- Puerto AMI: 5038
+- Usuario AMI: admin
+- Contraseña AMI: admin
+- Puerto ARI: 8088
+- Usuario ARI: admin
+- Contraseña ARI: admin
+
+CONFIGURACIÓN DE USUARIOS:
+1. Usuario administrador:
+   - Login Odoo: admin
+   - Extensión: 1001
+   - Contraseña SIP: clave_segura
+
+2. Usuario prueba:
+   - Login Odoo: usuario_prueba
+   - Extensión: 1002
+   - Contraseña SIP: clave_segura2
+
+3. Usuario VoIPVoIP:
+   - Login Odoo: voipvoip_user
+   - Extensión: 100
+   - Usuario SIP: 508443-100
+   - Contraseña SIP: [configurar en pjsip.conf]
+
+CONFIGURACIÓN DE SOFTPHONE:
+- Servidor SIP: $EXTERNAL_IP:5060
+- Protocolo: UDP
+- Codecs: ulaw, alaw, g722
+
+NÚMEROS DE PRUEBA:
+- 600: Echo test
+- *97: Acceso a buzón de voz
+- 9 + número: Llamadas salientes
+
+TRUNK CONFIGURADO:
+- Proveedor: Zadarma
+- Usuario: 908733
+- Servidor: sip.zadarma.com:5060
+EOF
+
+    echo -e "${GREEN}[✓] Archivo de configuración creado: odoo_asterisk_config.txt${NC}"
 }
 
-# Función para mostrar un resumen de configuración actual
-show_config_summary() {
-    echo ""
-    echo "===================================================================="
-    echo "               RESUMEN DE CONFIGURACIÓN ACTUAL                      "
-    echo "===================================================================="
-    echo ""
-    echo "IP EXTERNA: $(get_external_ip)"
-    echo ""
-    echo "PUERTOS CONFIGURADOS:"
-    echo " - SIP: 5060 (UDP/TCP)"
-    echo " - AMI: 5038 (TCP)"
-    echo " - Asterisk ARI: 8088 (TCP)"
-    echo " - RTP: 10000-20000 (UDP)"
-    echo ""
-    echo "MÓDULOS ENCONTRADOS:"
-    for module in "${REQUIRED_MODULES[@]}"; do
-        if [ -d "$ODOO_ADDONS_DIR/$module" ]; then
-            echo " - $module: ✓"
+# Crear script de diagnóstico
+create_diagnostic_script() {
+    echo -e "${BLUE}[+] Creando script de diagnóstico...${NC}"
+    
+    cat > "$WORKING_DIR/asterisk_diagnostics.sh" << 'EOF'
+#!/bin/bash
+
+echo "=== DIAGNÓSTICO ASTERISK ==="
+echo "Timestamp: $(date)"
+echo ""
+
+echo "1. ESTADO DEL SERVICIO:"
+systemctl status asterisk --no-pager -l
+
+echo ""
+echo "2. PUERTOS EN USO:"
+netstat -tuln | grep -E ":(5060|5038|8088)"
+
+echo ""
+echo "3. REGISTROS SIP:"
+asterisk -rx "pjsip show registrations"
+
+echo ""
+echo "4. ENDPOINTS:"
+asterisk -rx "pjsip show endpoints"
+
+echo ""
+echo "5. CANALES ACTIVOS:"
+asterisk -rx "core show channels"
+
+echo ""
+echo "6. ÚLTIMOS LOGS (últimas 10 líneas):"
+tail -n 10 /var/log/asterisk/full
+
+echo ""
+echo "7. MEMORIA Y CPU:"
+ps aux | grep asterisk | grep -v grep
+
+echo ""
+echo "=== FIN DIAGNÓSTICO ==="
+EOF
+
+    chmod +x "$WORKING_DIR/asterisk_diagnostics.sh"
+    echo -e "${GREEN}[✓] Script de diagnóstico creado: asterisk_diagnostics.sh${NC}"
+}
+
+# Verificar módulos de Odoo específicos
+verify_odoo_modules() {
+    echo -e "${BLUE}[+] Verificando módulos de Odoo Call Center...${NC}"
+    
+    local modules_dir="external-addons"
+    local required_modules=("asterisk_plus" "base_phone" "asterisk_click2dial")
+    
+    if [ ! -d "$modules_dir" ]; then
+        echo -e "${YELLOW}[!] Directorio $modules_dir no encontrado${NC}"
+        return 1
+    fi
+    
+    for module in "${required_modules[@]}"; do
+        if [ -d "$modules_dir/$module" ]; then
+            echo -e "${GREEN}[✓] Módulo $module encontrado${NC}"
         else
-            echo " - $module: ✗"
+            echo -e "${YELLOW}[!] Módulo $module no encontrado${NC}"
         fi
     done
-    echo ""
-    echo "USUARIOS CONFIGURADOS:"
-    echo " - Extensión 1001: Administrador (admin)"
-    echo " - Extensión 1002: Usuario Prueba (usuario_prueba)"
-    echo " - Extensión 2000: Test Extension (test_extension)"
-    echo ""
-    echo "PROVEEDOR VOIP:"
-    echo " - Servicio: Zadarma"
-    echo " - Usuario: 908733"
-    echo " - Servidor: sip.zadarma.com"
-    echo ""
-    echo "===================================================================="
 }
 
-# Función principal
+# Configurar logs rotativos para Asterisk
+configure_log_rotation() {
+    echo -e "${BLUE}[+] Configurando rotación de logs...${NC}"
+    
+    cat > "/etc/logrotate.d/asterisk" << 'EOF'
+/var/log/asterisk/full
+/var/log/asterisk/messages
+/var/log/asterisk/error {
+    daily
+    missingok
+    rotate 7
+    compress
+    notifempty
+    create 0644 asterisk asterisk
+    postrotate
+        /usr/sbin/asterisk -rx 'logger rotate' > /dev/null 2>&1 || true
+    endscript
+}
+EOF
+
+    echo -e "${GREEN}[✓] Rotación de logs configurada${NC}"
+}
+
+# Función principal optimizada
 main1() {
-    echo "[+] Iniciando configuración del Call Center para Odoo con Asterisk..."
+    echo -e "${GREEN}[+] Iniciando optimización específica de Asterisk...${NC}"
     
-    # Crear directorio temporal si no existe
-    mkdir -p $TEMP_DIR
+    # Verificar que el script principal ya se ejecutó
+    check_main_script_execution
     
-    # Verificar módulos requeridos
-    check_required_modules
+    # Optimizaciones específicas
+    optimize_asterisk_performance
+    configure_asterisk_firewall
+    configure_log_rotation
     
-    # Instalar dependencias del sistema
-    install_system_dependencies
+    # Tests y diagnósticos
+    advanced_asterisk_connectivity_test
     
-    # Configurar Asterisk
-    configure_asterisk
+    # Generar archivos de ayuda
+    generate_odoo_asterisk_config
+    create_diagnostic_script
     
-    # Configurar permisos
-   #set_permissions
+    # Verificaciones adicionales
+    verify_odoo_modules
     
-    # Crear extensión SIP de prueba
-    create_test_sip_extension
-    
-    # Test de conectividad
-    test_asterisk_connectivity
-    
-    # Mostrar resumen de configuración
-    show_config_summary
-    
-    # Mostrar instrucciones post-instalación
-    post_install_instructions
-    
-    echo "[+] ¡Configuración del Call Center completada!"
+    echo ""
+    echo -e "${GREEN}=================================================================="
+    echo -e "           OPTIMIZACIÓN DE ASTERISK COMPLETADA"
+    echo -e "==================================================================${NC}"
+    echo ""
+    echo -e "${YELLOW}ARCHIVOS GENERADOS:${NC}"
+    echo -e "  ✓ odoo_asterisk_config.txt - Configuración para Odoo"
+    echo -e "  ✓ asterisk_diagnostics.sh - Script de diagnóstico"
+    echo ""
+    echo -e "${YELLOW}OPTIMIZACIONES APLICADAS:${NC}"
+    echo -e "  ✓ Configuración de logs optimizada"
+    echo -e "  ✓ Rotación automática de logs"
+    echo -e "  ✓ Reglas de firewall configuradas"
+    echo -e "  ✓ Tests de conectividad realizados"
+    echo ""
+    echo -e "${YELLOW}PARA DIAGNÓSTICO:${NC}"
+    echo -e "  Ejecute: ./asterisk_diagnostics.sh"
+    echo ""
+    echo -e "${GREEN}¡Optimización completada exitosamente!${NC}"
 }
 
-# Ejecutar la función principal
+# Ejecutar función principal
 main1
 
 #--------------------------------------------------------
