@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+  <record model="ir.actions.server" id="asterisk_settings_action">
+      <field name="type">ir.actions.server</field>
+      <field name="name">General Settings</field>
+      <field name="state">code</field>
+      <field name="model_id" ref="model_asterisk_plus_settings"/>
+      <field name="code">action = model.open_settings_form()</field>
+  </record>
+
+  <menuitem id="settings_menu" parent="asterisk_plus.asterisk_settings_menu"
+      groups="asterisk_plus.group_asterisk_admin"
+      action="asterisk_settings_action" name="General" sequence="70"/>
+
+  <record id='asterisk_settings_form' model='ir.ui.view'>
+      <field name='name'>asterisk_plus.settings.form</field>
+      <field name='model'>asterisk_plus.settings</field>
+      <field name='type'>form</field>
+      <field name='arch' type='xml'>
+        <form create="false" delete="false">
+            <sheet>
+              <notebook>
+                <page name="general" string="General"
+                      attrs="{'invisible': [('is_registered', '=', False)]}">
+                  <group>
+                    <group>
+                      <field name="module_version"/>
+                      <field name="debug_mode"/>
+                      <field placeholder="IP addresses by comma..."
+                        name="permit_ip_addresses"/>
+                    </group>
+                    <group name="originate" string="Originate Parameters">
+                      <field name="originate_context"/>
+                      <field name="originate_timeout"/>
+                    </group>
+                  </group>
+                  <group>
+                    <group name="ui" string="User Interface">
+                      <field name="auto_reload_calls"/>
+                      <field name="auto_reload_channels"/>
+                    </group>
+                  </group>
+                </page>
+                <page name="calls" string="Calls"
+                      attrs="{'invisible': [('is_registered', '=', False)]}">
+                  <group>
+                      <group string="Call Options" name="options">
+                        <field name="auto_create_partners"/>
+                        <field name="calls_keep_days"/>
+                        <field name="number_search_operation"/>
+                        <field name="disable_phone_format"/>
+                      </group>
+                      <group string="Call Recording">
+                        <field name="record_calls"/>
+                        <field name="recordings_access"/>
+                        <field name="recordings_access_url"
+                               attrs="{'invisible': [('recordings_access', 'not in', ['remote','asterisk_http'])],
+                                       'required': [('recordings_access', 'in', ['remote', 'asterisk_http'])]}"/>
+                        <!-- S3 -->
+                        <field name="recordings_s3_region" placeholder="eu-central-1"
+                               attrs="{'invisible': [('recordings_access', '!=', 's3')],
+                                       'required': [('recordings_access', '=', 's3')]}"/>
+                        <field name="recordings_s3_bucket" placeholder="testbucket"
+                               attrs="{'invisible': [('recordings_access', '!=', 's3')],
+                                       'required': [('recordings_access', '=', 's3')]}"/>
+                        <field name="recordings_s3_key" password="1"
+                               attrs="{'invisible': [('recordings_access', '!=', 's3')],
+                                       'required': [('recordings_access', '=', 's3')]}"/>
+                        <field name="recordings_s3_secret" password="1"
+                               attrs="{'invisible': [('recordings_access', '!=', 's3')],
+                                       'required': [('recordings_access', '=', 's3')]}"/>
+                        <!-- End of S3 -->
+                        <field name="recordings_keep_days"/>
+                        <field name="use_mp3_encoder"
+                               attrs="{'invisible': [('record_calls', '=', False)]}"/>
+                        <field name="mp3_encoder_bitrate"
+                               attrs="{'invisible': ['|',('record_calls', '=', False), ('use_mp3_encoder','=',False)], 'required': [('use_mp3_encoder','=',True)]}"/>
+                        <field name="mp3_encoder_quality"
+                               attrs="{'invisible': ['|',('record_calls', '=', False), ('use_mp3_encoder','=',False)], 'required': [('use_mp3_encoder','=',True)]}"/>
+                        <label for="recording_storage" string="Recording Storage"
+                               attrs="{'invisible': ['|',('record_calls', '=', False),('recordings_access', 'not in', ['local','remote'])]}"/>
+                          <div class="d-flex">
+                            <field name="recording_storage" class="w-50"
+                                   attrs="{'invisible': ['|',('record_calls', '=', False),('recordings_access', 'not in', ['local','remote'])]}" />
+                            <button type="object" name="sync_recording_storage" string="Move storage" icon="fa-refresh" help="Use this button after changing the storage type."
+                                    attrs="{'invisible': ['|',('record_calls', '=', False),('recordings_access', 'not in', ['local','remote'])]}"/>
+                          </div>
+                      </group>
+                    </group>
+                </page>
+                <page name="transcription" string="Transcription"
+                      attrs="{'invisible': ['|',('record_calls', '=', False),('is_registered', '=', False)]}">
+                  <group>
+                    <group>
+                      <field name="transcribe_calls"/>
+                      <field name="openai_api_key_display" password="1"
+                             attrs="{'invisible': [('transcribe_calls', '=', False)]}"/>
+                      <field name="summary_prompt"/>
+                      <field name="completion_model"/>
+                      <field name="register_summary"
+                             attrs="{'invisible': [('transcribe_calls', '=', False)]}"/>
+                      <field name="remove_recording_after_transcript"
+                             attrs="{'invisible': [('transcribe_calls', '=', False)]}"/>
+                    </group>
+                    <group string="Transcription Rules"
+                           attrs="{'invisible': [('transcribe_calls', '=', False)]}">
+                      <field name="transcription_rules">
+                        <tree editable="bottom">
+                          <field name="id"/>
+                          <field name="calling_number"/>
+                          <field name="called_number"/>
+                        </tree>
+                      </field>
+                    </group>
+                  </group>
+                </page>
+                <!-- REGISTRATION PAGE -->
+                <page name="registraton" string="Registration">
+                <group  attrs="{'invisible': [('is_registered', '=', True)]}">
+                  <div colspan="2" style="font-size: small;">
+                    <strong >Registration is required to activate and use this product. We use it only for internal sales and support processes. Please read our <a target="_new" href="https://oduist.com/privacy">data privacy policy.</a></strong>
+                  </div>
+                  <div colspan="2" style="font-size: small;">
+                    <field name="i_agree_to_register" nolabel="1"/>
+                    <label for="i_agree_to_register" string="I agree to create an account in the Oduist users portal to receive free technical support from Oduist team."/>
+                  </div>
+                  <div colspan="2" style="font-size: small;">
+                  <field name="i_agree_to_receive"/>
+                  <label for="i_agree_to_receive" string="I agree to receive important product notifications, including security advisories, major updates, and critical patches that may affect my installation."/>
+                  </div>
+                  <div colspan="2" style="font-size: small;">
+                    <field name="i_agree_to_contact"/>
+                    <label for="i_agree_to_contact" string="I agree to be contacted by sales representatives who can help me understand additional services and support options available for my installation."/>
+                  </div>
+                </group>
+                <group>
+                        <group name="registration" string="Registration">
+                            <field colspan="2" name="registration_number"
+                                   attrs="{'invisible': [('is_registered', '=', False)]}"/>
+                            <field colspan="2" name="customer_code"
+                                   attrs="{'invisible': [('is_registered', '=', True)]}"/>
+                            <button colspan="2" name="register_instance" class="btn btn-info btn-lg me-1" type="object" string="SUBMIT REGISTRATION"
+                                    attrs="{'invisible': ['|', '|', '|', ('is_registered', '=', True), ('i_agree_to_register', '=', False), ('i_agree_to_receive', '=', False), ('i_agree_to_contact', '=', False)]}"/>
+                            <field name="is_registered" invisible="1"/>
+                            <p colspan="2"
+                               attrs="{'invisible': [('i_agree_to_register', '=', True), ('i_agree_to_receive', '=', True), '|', ('i_agree_to_contact', '=', True), ('is_registered', '=', True),]}">
+                              Our product is <b>open source and free to use</b>, but it's <b>also a commercial solution used in business-critical environments</b>.<br/>
+                              While we're committed to keeping the product open source, <b>we need sustainable ways to support its development and maintenance</b>.<br/>
+                              We want to share why we ask for these permissions:
+                              <ul>
+                              <li><strong>Security First:</strong> We take security very seriously. If a critical bug or vulnerability is discovered, we need to ensure we can reach <strong>every user</strong> to provide an immediate fix.</li>
+                              <li><strong>Ongoing Development:</strong> Even though the core product is free, we still need resources to maintain, improve, and support it. By staying connected, you help us continue innovating.</li>
+                              <li><strong>Value-Added Services:</strong> We offer optional premium services that provide additional benefits, including SLA support, consulting, and advanced features. Having your contact details allows us to inform you about solutions that might help your business grow.</li>
+                              <li><strong>Community and Support</strong>: Registering in our portal gives you access to knowledge bases, user forums, and troubleshooting help from other users and our team.</li>
+                              </ul>
+                              Your privacy is our priority - your registration data remains strictly confidential. We do not sell or misuse your information.<br/>
+                              <strong>Thanks a lot for your trust, understanding and support! Welcome to our community!</strong>
+                            </p>
+                        </group>
+                        <group string="Technical Support" attrs="{'invisible': [('is_registered', '=', False)]}">
+                            <p colspan="2" >
+                              <a role="button" class="btn btn-primary" href="https://oduist.com/knowledge/article/39" target="_new">DOCUMENTATION</a> |
+                              <a role="button" class="btn btn-info" href="https://oduist.com/forum/user-support-portal-1" target="_new">FREE SUPPORT</a> |
+                              <a role="button" class="btn btn-success" href="https://oduist.com/support" target="_new">COMMERCIAL SUPPORT</a>
+                            </p>
+                            <img alt="Great support!" colspan="2" src="/asterisk_plus/static/description/support.jpg" width="100%"/>
+                        </group>
+                        <group name="registration_data" string="Registration Data" attrs="{'invisible': [('is_registered', '=', True)]}">
+                            <field name="company_name"/>
+                            <field name="company_email"/>
+                            <field name="company_phone"/>
+                            <field name="company_country"/>
+                            <field name="company_city"/>
+                            <button colspan="2" name="update_company_data_button" string="UPDATE COMPANY DATA" type="object"/>
+                            <field name="admin_name"/>
+                            <field name="admin_email"/>
+                            <field name="admin_phone"/>
+                            <button colspan="2" name="update_admin_data_button" string="UPDATE ADMIN DATA" type="object"/>
+                            <field name="web_base_url"/>
+                        </group>
+                    </group>
+                </page>
+              </notebook>
+            </sheet>
+        </form>
+      </field>
+  </record>
+
+</odoo>
