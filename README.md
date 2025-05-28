@@ -222,7 +222,7 @@ Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más det
 Si encuentras algún problema o tienes preguntas:
 
 - 🐛 **Issues**: [GitHub Issues](../../issues)
-- 📧 **Email**: [tu-email@ejemplo.com]
+- 📧 **Email**: [i22prpaj@uco.es] **o** [i22jicof@uco.es]
 - 💬 **Discusiones**: [GitHub Discussions](../../discussions)
 
 ## ⭐ ¿Te ha sido útil?
