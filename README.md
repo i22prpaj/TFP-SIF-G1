@@ -1,60 +1,42 @@
-🎯 Comandos Disponibles (Opcionales)
-Script Principal (odoo16-*.sh)
-Una vez completada la instalación inicial, puedes usar estos comandos para gestionar el sistema:
-ComandoDescripción-start🚀 Inicia el despliegue completo-stop⏹️ Detiene todos los contenedores-restart🔄 Reinicia el sistema completo-backup💾 Crea copia de seguridad-restore📥 Restaura desde backup-configure⚙️ Solo configura (sin iniciar)-status📊 Muestra estado del sistema
-Ejemplos de gestión:
-bash# Ver estado actual
-./odoo16-local.sh -status
-
-# Crear backup
-./odoo16-local.sh -backup
-
-# Reiniciar servicios
-./odoo16-local.sh -restart
-```# 🚀 Odoo 16 Deployment Scripts
-
+🚀 Odoo 16 Deployment Scripts
 <div align="center">
-
-![Odoo](https://img.shields.io/badge/Odoo-16.0-714B67?style=for-the-badge&logo=odoo&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-13-336791?style=for-the-badge&logo=postgresql&logoColor=white)
-![Asterisk](https://img.shields.io/badge/Asterisk-PBX-FF6B35?style=for-the-badge&logo=asterisk&logoColor=white)
-![GCP](https://img.shields.io/badge/Google_Cloud-4285F4?style=for-the-badge&logo=google-cloud&logoColor=white)
-
-**Automatiza el despliegue completo de Odoo 16 con PostgreSQL y Asterisk PBX**
-
+Mostrar imagen
+Mostrar imagen
+Mostrar imagen
+Mostrar imagen
+Mostrar imagen
+🚀 Automatiza el despliegue completo de Odoo 16 con PostgreSQL y Asterisk PBX
+Despliega en minutos tu ERP completo con sistema VoIP integrado
 </div>
+📋 Descripción
+Este repositorio contiene scripts automatizados para desplegar Odoo 16 con PostgreSQL y Asterisk PBX usando Docker Compose. Incluye dos versiones optimizadas para diferentes entornos:
 
-## 📋 Descripción
+🏠 Local: Para desarrollo y pruebas en tu máquina local
+☁️ Google Cloud Platform (GCP): Para producción en la nube
 
-Este repositorio contiene scripts automatizados para desplegar **Odoo 16** con **PostgreSQL** y **Asterisk PBX** usando Docker Compose. Incluye dos versiones optimizadas para diferentes entornos:
+✨ Características
 
-- 🏠 **Local**: Para desarrollo y pruebas en tu máquina local
-- ☁️ **Google Cloud Platform (GCP)**: Para producción en la nube
+⚡ Instalación automática de Docker y Docker Compose
+🐘 PostgreSQL 13 preconfigurado como base de datos
+📞 Asterisk PBX integrado para comunicaciones VoIP
+🔧 Configuración automática del firewall (GCP)
+💾 Sistema de backups incluido
+🔄 Gestión completa del ciclo de vida de contenedores
+📁 Volúmenes persistentes para datos y add-ons
 
-## ✨ Características
+🛠️ Instalación y Uso
+Paso 1: Descargar y guardar los scripts
 
-- ⚡ **Instalación automática** de Docker y Docker Compose
-- 🐘 **PostgreSQL 13** preconfigurado como base de datos
-- 📞 **Asterisk PBX** integrado para comunicaciones VoIP
-- 🔧 **Configuración automática** del firewall (GCP)
-- 💾 **Sistema de backups** incluido
-- 🔄 **Gestión completa** del ciclo de vida de contenedores
-- 📁 **Volúmenes persistentes** para datos y add-ons
+Guarda los archivos en tu sistema:
 
-## 🛠️ Instalación y Uso
+odoo16-local.sh (para entorno local)
+odoo16-gcp.sh (para Google Cloud Platform)
+asterisk.sh (para configuración de Asterisk PBX)
 
-### Paso 1: Descargar y guardar los scripts
 
-1. **Guarda** los archivos en tu sistema:
-   - `odoo16-local.sh` (para entorno local)
-   - `odoo16-gcp.sh` (para Google Cloud Platform)
-   - `asterisk.sh` (para configuración de Asterisk PBX)
 
-### Paso 2: Dar permisos de ejecución
-
-```bash
-sudo chmod u+x odoo16-local.sh     # Para entorno local
+Paso 2: Dar permisos de ejecución
+bashsudo chmod u+x odoo16-local.sh     # Para entorno local
 sudo chmod u+x odoo16-gcp.sh       # Para GCP
 sudo chmod u+x asterisk.sh         # Para Asterisk PBX
 Paso 3: Ejecutar en orden
@@ -73,6 +55,19 @@ bash# 1. Primero ejecutar el script principal de Odoo
 
 ⚠️ Orden Importante: Siempre ejecuta primero el script de Odoo con -start y después el script de Asterisk sin parámetros.
 
+🎯 Comandos Disponibles (Opcionales)
+Script Principal (odoo16-*.sh)
+Una vez completada la instalación inicial, puedes usar estos comandos para gestionar el sistema:
+ComandoDescripción-start🚀 Inicia el despliegue completo-stop⏹️ Detiene todos los contenedores-restart🔄 Reinicia el sistema completo-backup💾 Crea copia de seguridad-restore📥 Restaura desde backup-configure⚙️ Solo configura (sin iniciar)-status📊 Muestra estado del sistema
+Ejemplos de gestión:
+bash# Ver estado actual
+./odoo16-local.sh -status
+
+# Crear backup
+./odoo16-local.sh -backup
+
+# Reiniciar servicios
+./odoo16-local.sh -restart
 🌐 Acceso a las Aplicaciones
 Una vez desplegado el sistema:
 🏠 Entorno Local:
@@ -187,4 +182,9 @@ Si encuentras algún problema o tienes preguntas:
 Si este proyecto te ha ayudado, ¡dale una estrella! ⭐
 
 <div align="center">
-Hecho con ❤️ para la comunidad Odoo
+🛠️ Hecho con ❤️ para la comunidad Odoo
+Mostrar imagen
+Mostrar imagen
+Mostrar imagen
+Si este proyecto te ha ayudado, ¡considera darle una ⭐!
+</div>
